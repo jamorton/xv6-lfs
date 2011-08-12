@@ -1,51 +1,51 @@
-// On-disk file system format. 
-// Both the kernel and user programs use this header file.
+#ifndef __FS_H__
+#define __FS_H__
 
-// Block 0 is unused.
-// Block 1 is super block.
-// Inodes start at block 2.
+#define BSIZE 4096
+#define SEGSIZE 1024*1024 // 1mb
 
-#define ROOTINO 1  // root i-number
-#define BSIZE 512  // block size
+typedef uint block_t;
 
-// File system super block
-struct superblock {
-  uint size;         // Size of file system image (blocks)
-  uint nblocks;      // Number of data blocks
-  uint ninodes;      // Number of inodes.
+struct disk_superblock {
+	uint nsegs; // number of segments
+	uint segment; // checkpoint
+	block_t imap; // start block of imap
+	uint ninodes;
+	uint blocks;
 };
 
-#define NDIRECT 12
-#define NINDIRECT (BSIZE / sizeof(uint))
-#define MAXFILE (NDIRECT + NINDIRECT)
+#define DISK_INODE_DATA 12 // size of disk_inode excluding addrs
+#if DISK_INODE_DATA % 4 != 0
+  #error disk_inode data must be multiple of 12
+#endif
 
-// On-disk inode structure
-struct dinode {
-  short type;           // File type
-  short major;          // Major device number (T_DEV only)
-  short minor;          // Minor device number (T_DEV only)
-  short nlink;          // Number of links to inode in file system
-  uint size;            // Size of file (bytes)
-  uint addrs[NDIRECT+1];   // Data block addresses
+#define INDIRECT_LEVELS 2 // direct, indirect, double indirect
+
+#define NADDRS ((64 - DISK_INODE_DATA) / 4)
+#define NDIRECT (NADDRS - INDIRECT_LEVELS)
+#define NINDIRECT (BSIZE / sizeof(block_t))
+
+static const uint __LEVEL_SIZES[] = {
+	NDIRECT,
+	NINDIRECT,
+	NINDIRECT * NINDIRECT,
+	NINDIRECT * NINDIRECT * NINDIRECT
 };
 
-// Inodes per block.
-#define IPB           (BSIZE / sizeof(struct dinode))
+#define INDIRECT_SIZE(n) (__LEVEL_SIZES[(n)])
 
-// Block containing inode i
-#define IBLOCK(i)     ((i) / IPB + 2)
+// must change this when INDIRECT_LEVELS is changed
+#define MAXFILE (NDIRECT + NINDIRECT + NINDIRECT * NINDIRECT)
 
-// Bitmap bits per block
-#define BPB           (BSIZE*8)
-
-// Block containing bit for block b
-#define BBLOCK(b, ninodes) (b/BPB + (ninodes)/IPB + 3)
-
-// Directory is a file containing a sequence of dirent structures.
-#define DIRSIZ 14
-
-struct dirent {
-  ushort inum;
-  char name[DIRSIZ];
+struct disk_inode {
+	short type;
+	short major;
+	short minor;
+	short nlink;
+	uint size;
+	block_t addrs[NADDRS];
 };
 
+#define IPB (BSIZE/sizeof(disk_inode));
+
+#endif
