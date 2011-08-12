@@ -97,11 +97,11 @@ struct disk_inode * ialloc(short type)
 
 block_t read_addrblock(block_t * addr, block_t ** ret)
 {
-	if (*addr == 0)
-		*addr = balloc();
-	block_t r = *addr;
-	bread(*addr, *ret);
-	return r;
+	block_t b = *addr;
+	if (b == 0)
+		b = balloc();
+	bread(b, *ret);
+	return b;
 }
 
 void inode_addr(block_t * addrs, block_t ** ret,  uint level)
@@ -117,30 +117,43 @@ void inode_addr(block_t * addrs, block_t ** ret,  uint level)
 block_t append_block(block_t * addrs, void * data, uint off, uint len)
 {
 	printf("input %u\n", off / BSIZE);
-	uint bn = off / BSIZE, cnt = 0;
-	int level = -1;
+
+	// find indirection level to start at
+	uint bn = off / BSIZE, cnt = 0, level = 0;
 	while (1) {
-		cnt += INDIRECT_SIZE(++level);
+		cnt += INDIRECT_SIZE(level);
 		if (cnt > bn)
 			break;
-		off -= INDIRECT_SIZE(level) * BSIZE;
+		off -= INDIRECT_SIZE(level++) * BSIZE;
 	}
 
 	printf("level: %u  new off: %u\n", level, off / BSIZE);
 
-	block_t * level_addrs = malloc(NINDIRECT * sizeof(block_t));
-	inode_addr(addrs, &level_addrs, level);
+	block_t * level_addrs = malloc(BSIZE);
+
+	if (level != 0) {
+		uint a = level + NDIRECT - 1;
+		if (addrs[a] == 0)
+			addrs[a] = balloc();
+		bread(addrs[a], level_addrs);
+	} else
+		level_addrs = addrs;
 
 	uint l;
 	block_t block_n;
 	for (l = level; l > 0; l--) {
-		uint c, div = BSIZE;
-		for (c = l - 1; c > 0; c--)
+		uint c = l - 1, div = BSIZE;
+		while (c--)
 			div *= NINDIRECT;
-		uint num = off / div;
+		block_t n = off / div;
 		off = off % div;
-		printf(" div %u   bn: %u, new off: %u\n", div/BSIZE, num, off/BSIZE);
-		block_n = read_addrblock(level_addrs + num, &level_addrs);
+		printf(" div %u   bn: %u, new off: %u\n", div/BSIZE, n, off/BSIZE);
+		if (level_addrs[n] == 0) {
+			level_addrs[n] = balloc();
+			bwrite(block_n, level_addrs);
+		}
+		block_n = level_addrs[n];
+		bread(level_addrs[n], level_addrs);
 	}
 
 	free(level_addrs);
@@ -160,4 +173,5 @@ block_t append_block(block_t * addrs, void * data, uint off, uint len)
 void iappend(struct disk_inode * ip, void * data, uint len)
 {
 	uint wr = 0;
+	(void)wr;
 }
