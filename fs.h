@@ -5,13 +5,14 @@
 #define SEGSIZE 1024*1024 // 1mb
 
 typedef uint block_t;
+typedef uint inode_t;
 
 struct disk_superblock {
 	uint nsegs; // number of segments
 	uint segment; // checkpoint
-	block_t imap; // start block of imap
+	block_t imap; // imap block
 	uint ninodes;
-	uint blocks;
+	uint nblocks;
 };
 
 #define DISK_INODE_DATA 12 // size of disk_inode excluding addrs
@@ -47,5 +48,14 @@ struct disk_inode {
 };
 
 #define IPB (BSIZE/sizeof(disk_inode));
+
+// Directory is a file containing a sequence of dirent structures.
+#define DIRSIZ 14
+
+struct dirent {
+  ushort inum;
+  char name[DIRSIZ];
+};
+
 
 #endif
