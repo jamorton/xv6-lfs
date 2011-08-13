@@ -22,10 +22,12 @@
 
 // global variables
 int fsd;
+struct disk_superblock sb;
 
 block_t imap[MAX_INODES];
 static block_t cur_block = 1; // 0 reserved for superblock
 static inode_t cur_inode = 0;
+static uint seg_nblocks = 0;
 
 // block funcs
 block_t balloc(void);
@@ -40,6 +42,8 @@ block_t append_block(block_t *, void * data, uint off, uint len);
 
 int main(int argc, char * argv[])
 {
+	bzero(&sb, sizeof(sb));
+
 	if (argc < 2) {
 		printf("Usage: mkfs [image file] [input files...]\n");
 		exit(1);
@@ -93,15 +97,11 @@ int main(int argc, char * argv[])
 	
 	block_t imap_block = balloc();
 	bwrite(imap_block, imap);
-
-	struct disk_superblock * sb = malloc(BSIZE);
-	sb->imap = imap_block;
-	sb->nblocks = cur_block;
-	sb->ninodes = cur_inode;
-	sb->nsegs = 0;
-	sb->segment = 0;
-	bwrite(0, sb);
-	free(sb);
+	
+	sb.imap = imap_block;
+	sb.nblocks = cur_block;
+	sb.ninodes = cur_inode;
+	bwrite(0, &sb);
 
 	close(fsd);
 
@@ -110,10 +110,20 @@ int main(int argc, char * argv[])
 
 block_t balloc(void)
 {
-	uchar zeroes[BSIZE];
+	char zeroes[BSIZE];
 	bzero(zeroes, BSIZE);
 
 	bwrite(cur_block, zeroes);
+	seg_nblocks++;
+
+	// segment is full.
+	if (seg_nblocks  >= SEGBLOCKS) {
+		seg_nblocks = 0;
+		block_t segstart = cur_block - SEGBLOCKS;
+		sb.segment = segstart;
+		sb.nsegs++;
+	}
+
 	return cur_block++;
 }
 
