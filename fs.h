@@ -1,8 +1,9 @@
 #ifndef __FS_H__
 #define __FS_H__
 
-#define BSIZE 4096
-#define SEGSIZE 1024*1024 // 1mb
+#define BSIZE (4096)
+#define SEGSIZE (1024*1024) // 1mb
+#define SEGBLOCKS ((SEGSIZE)/(BSIZE)-1) // 1 block for seg info
 
 typedef uint block_t;
 typedef uint inode_t;

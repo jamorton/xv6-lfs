@@ -98,10 +98,12 @@ int main(int argc, char * argv[])
 	block_t imap_block = balloc();
 	bwrite(imap_block, imap);
 	
+	char buf[BSIZE];
 	sb.imap = imap_block;
 	sb.nblocks = cur_block;
 	sb.ninodes = cur_inode;
-	bwrite(0, &sb);
+	memcpy(buf, &sb, sizeof(sb));
+	bwrite(0, buf);
 
 	close(fsd);
 
@@ -122,6 +124,7 @@ block_t balloc(void)
 		block_t segstart = cur_block - SEGBLOCKS;
 		sb.segment = segstart;
 		sb.nsegs++;
+		cur_block++;
 	}
 
 	return cur_block++;
