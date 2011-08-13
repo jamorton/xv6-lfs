@@ -1,8 +1,6 @@
 /*
   mkfs for a log-structured filesystem
-
-  todo:
-  - support inodes bigger than a segment
+  see README.
 */
 
 #include <stdio.h>
