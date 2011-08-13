@@ -1,3 +1,4 @@
+
 /*
   mkfs for a log-structured filesystem
   see README.
@@ -115,19 +116,20 @@ block_t balloc(void)
 	char zeroes[BSIZE];
 	bzero(zeroes, BSIZE);
 
-	bwrite(cur_block, zeroes);
-	seg_nblocks++;
+	block_t bret = cur_block++;
+	bwrite(bret, zeroes);
 
 	// segment is full.
-	if (seg_nblocks  >= SEGBLOCKS) {
+	if (++seg_nblocks >= SEGBLOCKS) {
+		printf("full segment at %u\n", cur_block);
+		printf("  start: %u\n", cur_block - SEGBLOCKS);
 		seg_nblocks = 0;
-		block_t segstart = cur_block - SEGBLOCKS;
-		sb.segment = segstart;
+		sb.segment = cur_block - SEGBLOCKS;
 		sb.nsegs++;
-		cur_block++;
+		bwrite(cur_block++, zeroes);
 	}
 
-	return cur_block++;
+	return bret;
 }
 
 #define FLOC(a) ((a) * BSIZE)
