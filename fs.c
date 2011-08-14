@@ -17,7 +17,6 @@
 #include "mmu.h"
 #include "proc.h"
 #include "spinlock.h"
-#include "buf.h"
 #include "fs.h"
 #include "file.h"
 
@@ -26,7 +25,7 @@ static void itrunc(struct inode*);
 
 // Read the super block.
 static void
-readsb(int dev, struct superblock *sb)
+readsb(int dev, struct disk_superblock *sb)
 {
   struct buf *bp;
   
@@ -53,11 +52,9 @@ bzero(int dev, int bno)
 static uint
 balloc(uint dev)
 {
-  int b, bi, m;
   struct buf *bp;
-  struct superblock sb;
+  struct disk_superblock sb;
 
-  bp = 0;
   readsb(dev, &sb);
   for(b = 0; b < sb.size; b += BPB){
     bp = bread(dev, BBLOCK(b, sb.ninodes));
@@ -80,7 +77,7 @@ static void
 bfree(int dev, uint b)
 {
   struct buf *bp;
-  struct superblock sb;
+  struct disk_superblock sb;
   int bi, m;
 
   bzero(dev, b);
@@ -148,13 +145,13 @@ ialloc(uint dev, short type)
 {
   int inum;
   struct buf *bp;
-  struct dinode *dip;
-  struct superblock sb;
+  struct disk_inode *dip;
+  struct disk_superblock sb;
 
   readsb(dev, &sb);
   for(inum = 1; inum < sb.ninodes; inum++){  // loop over inode blocks
     bp = bread(dev, IBLOCK(inum));
-    dip = (struct dinode*)bp->data + inum%IPB;
+    dip = (struct disk_inode*)bp->data + inum%IPB;
     if(dip->type == 0){  // a free inode
       memset(dip, 0, sizeof(*dip));
       dip->type = type;
@@ -172,10 +169,10 @@ void
 iupdate(struct inode *ip)
 {
   struct buf *bp;
-  struct dinode *dip;
+  struct disk_inode *dip;
 
   bp = bread(ip->dev, IBLOCK(ip->inum));
-  dip = (struct dinode*)bp->data + ip->inum%IPB;
+  dip = (struct disk_inode*)bp->data + ip->inum%IPB;
   dip->type = ip->type;
   dip->major = ip->major;
   dip->minor = ip->minor;
@@ -237,7 +234,7 @@ void
 ilock(struct inode *ip)
 {
   struct buf *bp;
-  struct dinode *dip;
+  struct disk_inode *dip;
 
   if(ip == 0 || ip->ref < 1)
     panic("ilock");
@@ -250,7 +247,7 @@ ilock(struct inode *ip)
 
   if(!(ip->flags & I_VALID)){
     bp = bread(ip->dev, IBLOCK(ip->inum));
-    dip = (struct dinode*)bp->data + ip->inum%IPB;
+    dip = (struct disk_inode*)bp->data + ip->inum%IPB;
     ip->type = dip->type;
     ip->major = dip->major;
     ip->minor = dip->minor;
