@@ -75,7 +75,7 @@ struct dirent {
 struct buf {
   int flags;
   uint dev;
-  uint block;
+  block_t block;
   struct buf *prev; // LRU cache list
   struct buf *next;
   struct buf *qnext; // disk queue

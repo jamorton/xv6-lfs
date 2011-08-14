@@ -59,7 +59,7 @@ binit(void)
 // If not found, allocate fresh block.
 // In either case, return locked buffer.
 static struct buf*
-bget(uint dev, uint block)
+bget(uint dev, block_t block)
 {
   struct buf *b;
 
@@ -94,7 +94,7 @@ bget(uint dev, uint block)
 
 // Return a B_BUSY buf with the contents of the indicated disk block.
 struct buf*
-bread(uint dev, uint block)
+bread(uint dev, block_t block)
 {
   struct buf *b;
 
