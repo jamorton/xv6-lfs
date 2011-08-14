@@ -18,8 +18,7 @@
 #define stat xv6_stat  // avoid clash with host struct stat
 #include "stat.h"
 
-#define DRIVE_SIZE (SEGSIZE * 20) // 20 segments
-#define MAX_INODES (BSIZE / sizeof(block_t))
+#define DRIVE_SIZE (SEGSIZE * 20) // 20 segment
 
 // global variables
 int fsd;

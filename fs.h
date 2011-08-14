@@ -5,6 +5,16 @@
 #define SEGSIZE (1024*1024) // 1mb
 #define SEGBLOCKS ((SEGSIZE)/(BSIZE)-1) // 1 block for seg info
 
+// sectors per block
+#define SPB (BSIZE / 512)
+#define IS_BLOCK_SECTOR(a) (((a) & (SPB - 1)) == 0) // is divisible by SPB
+
+// block to sector, sector to block
+// block 0 is sector 1, block 1 is sector 9, etc.
+// sector 0 is reserved for the bootloader
+#define B2S(b) ((b) * SPB + 1)
+#define S2B(s) (((s) - 1) / SPB)
+
 typedef uint block_t;
 typedef uint inode_t;
 
@@ -26,6 +36,9 @@ struct disk_superblock {
 #define NADDRS ((64 - DISK_INODE_DATA) / 4)
 #define NDIRECT (NADDRS - INDIRECT_LEVELS)
 #define NINDIRECT (BSIZE / sizeof(block_t))
+
+#define MAX_INODES (BSIZE / sizeof(block_t))
+
 
 static const uint __LEVEL_SIZES[] = {
 	NDIRECT,
@@ -62,7 +75,7 @@ struct dirent {
 struct buf {
   int flags;
   uint dev;
-  uint sector;
+  uint block;
   struct buf *prev; // LRU cache list
   struct buf *next;
   struct buf *qnext; // disk queue

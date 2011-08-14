@@ -55,11 +55,11 @@ binit(void)
   }
 }
 
-// Look through buffer cache for sector on device dev.
+// Look through buffer cache for block on device dev.
 // If not found, allocate fresh block.
 // In either case, return locked buffer.
 static struct buf*
-bget(uint dev, uint sector)
+bget(uint dev, uint block)
 {
   struct buf *b;
 
@@ -68,7 +68,7 @@ bget(uint dev, uint sector)
  loop:
   // Try for cached block.
   for(b = bcache.head.next; b != &bcache.head; b = b->next){
-    if(b->dev == dev && b->sector == sector){
+    if(b->dev == dev && b->block == block){
       if(!(b->flags & B_BUSY)){
         b->flags |= B_BUSY;
         release(&bcache.lock);
@@ -83,7 +83,7 @@ bget(uint dev, uint sector)
   for(b = bcache.head.prev; b != &bcache.head; b = b->prev){
     if((b->flags & B_BUSY) == 0){
       b->dev = dev;
-      b->sector = sector;
+      b->block = block;
       b->flags = B_BUSY;
       release(&bcache.lock);
       return b;
@@ -92,13 +92,13 @@ bget(uint dev, uint sector)
   panic("bget: no buffers");
 }
 
-// Return a B_BUSY buf with the contents of the indicated disk sector.
+// Return a B_BUSY buf with the contents of the indicated disk block.
 struct buf*
-bread(uint dev, uint sector)
+bread(uint dev, uint block)
 {
   struct buf *b;
 
-  b = bget(dev, sector);
+  b = bget(dev, block);
   if(!(b->flags & B_VALID))
     iderw(b);
   return b;
