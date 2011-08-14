@@ -3,7 +3,8 @@
 
 #define BSIZE (4096)
 #define SEGSIZE (1024*1024) // 1mb
-#define SEGBLOCKS ((SEGSIZE)/(BSIZE)-1) // 1 block for seg info
+#define SEGBLOCKS (SEGSIZE/BSIZE)
+#define SEGDATABLOCKS (SEGBLOCKS-1) // 1 block for seg info
 
 // sectors per block
 #define SPB (BSIZE / 512)
@@ -38,7 +39,6 @@ struct disk_superblock {
 #define NINDIRECT (BSIZE / sizeof(block_t))
 
 #define MAX_INODES (BSIZE / sizeof(block_t))
-
 
 static const uint __LEVEL_SIZES[] = {
 	NDIRECT,

@@ -123,11 +123,11 @@ block_t balloc(void)
 	bwrite(bret, zeroes);
 
 	// segment is full.
-	if (++seg_nblocks >= SEGBLOCKS) {
+	if (++seg_nblocks >= SEGDATABLOCKS) {
 		printf("full segment at %u\n", cur_block);
-		printf("  start: %u\n", cur_block - SEGBLOCKS);
+		printf("  start: %u\n", cur_block - SEGDATABLOCKS);
 		seg_nblocks = 0;
-		sb.segment = cur_block - SEGBLOCKS;
+		sb.segment = cur_block - SEGDATABLOCKS;
 		sb.nsegs++;
 		bwrite(cur_block++, zeroes);
 	}
