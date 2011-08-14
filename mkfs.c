@@ -26,7 +26,7 @@ int fsd;
 struct disk_superblock sb;
 
 block_t imap[MAX_INODES];
-static block_t cur_block = 1; // 0 reserved for superblock
+static block_t cur_block = 2; // 0/1 reserved for boot/superblock
 static inode_t cur_inode = 0;
 static uint seg_nblocks = 0;
 
@@ -100,11 +100,15 @@ int main(int argc, char * argv[])
 	bwrite(imap_block, imap);
 	
 	char buf[BSIZE];
+	bzero(buf, BSIZE);
+
+	bwrite(0, buf);
+
 	sb.imap = imap_block;
 	sb.nblocks = cur_block;
 	sb.ninodes = cur_inode;
 	memcpy(buf, &sb, sizeof(sb));
-	bwrite(0, buf);
+	bwrite(1, buf);
 
 	close(fsd);
 
