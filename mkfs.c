@@ -160,7 +160,7 @@ inode_t ialloc(short type)
 	ip->size = 0;
 
 	block_t nb = balloc();
-
+	printf("nb %u\n", nb);
 	bwrite(nb, ip);
 	imap[cur_inode] = nb;
 	free(ip);
@@ -207,7 +207,10 @@ block_t append_block(block_t * addrs, void * data, uint off, uint len)
 		bnext = addrs[a];
 		bread(addrs[a], level_addrs);
 	} else {
-		bnext = addrs[off / BSIZE];
+		uint nn = off / BSIZE;
+		if (addrs[nn] == 0)
+			addrs[nn] = balloc();
+		bnext = addrs[nn];
 		off = off % BSIZE;
 		goto append_block_final;
 	}
