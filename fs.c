@@ -29,12 +29,13 @@ readsb(int dev, struct disk_superblock *sb)
 {
   struct buf *bp;
   
-  bp = bread(dev, 1);
+  bp = bread(dev, 0);
   memmove(sb, bp->data, sizeof(*sb));
   brelse(bp);
 }
 
 // Zero a block.
+/*
 static void
 bzero(int dev, int bno)
 {
@@ -45,6 +46,7 @@ bzero(int dev, int bno)
   bwrite(bp);
   brelse(bp);
 }
+*/
 
 // Blocks. 
 
@@ -52,6 +54,8 @@ bzero(int dev, int bno)
 static uint
 balloc(uint dev)
 {
+  panic("balloc not implemented");
+/*
   struct buf *bp;
   struct disk_superblock sb;
 
@@ -70,12 +74,14 @@ balloc(uint dev)
     brelse(bp);
   }
   panic("balloc: out of blocks");
+*/
 }
 
 // Free a disk block.
 static void
-bfree(int dev, uint b)
+bfree(int dev, block_t b)
 {
+/*
   struct buf *bp;
   struct disk_superblock sb;
   int bi, m;
@@ -91,6 +97,8 @@ bfree(int dev, uint b)
   bp->data[bi/8] &= ~m;  // Mark block free on disk.
   bwrite(bp);
   brelse(bp);
+*/
+
 }
 
 // Inodes.
@@ -137,18 +145,51 @@ iinit(void)
   initlock(&icache.lock, "icache");
 }
 
+static void
+readimap(int dev, block_t * imap)
+{
+  struct buf * bp;
+  struct disk_superblock sb;
+  readsb(dev, &sb);
+
+  bp = bread(dev, sb.imap);
+  memmove(imap, bp->data, BSIZE);
+  brelse(bp);
+}
+
+static struct disk_inode *
+imapget(int dev, uint inum)
+{
+  struct buf * bp;
+  block_t imap[MAX_INODES];
+
+  readimap(dev, imap);
+
+  if (imap[inum] == 0)
+    panic("imapget: no imap number");
+  bp = bread(dev, imap[inum]);
+  return ((struct disk_inode *)bp->data);
+}
+
 static struct inode* iget(uint dev, uint inum);
 
 // Allocate a new inode with the given type on device dev.
 struct inode*
 ialloc(uint dev, short type)
 {
+
+  panic("ialloc: not implemented");
+
+  /*
   int inum;
   struct buf *bp;
   struct disk_inode *dip;
   struct disk_superblock sb;
+  block_t imap[MAX_INODES];
 
   readsb(dev, &sb);
+  readimap(dev, imap);
+
   for(inum = 1; inum < sb.ninodes; inum++){  // loop over inode blocks
     bp = bread(dev, IBLOCK(inum));
     dip = (struct disk_inode*)bp->data + inum%IPB;
@@ -162,12 +203,15 @@ ialloc(uint dev, short type)
     brelse(bp);
   }
   panic("ialloc: no inodes");
+  */
 }
 
 // Copy inode, which has changed, from memory to disk.
 void
 iupdate(struct inode *ip)
 {
+  panic("iupdate: not implemented");
+  /*
   struct buf *bp;
   struct disk_inode *dip;
 
@@ -181,6 +225,7 @@ iupdate(struct inode *ip)
   memmove(dip->addrs, ip->addrs, sizeof(ip->addrs));
   bwrite(bp);
   brelse(bp);
+  */
 }
 
 // Find the inode with number inum on device dev
@@ -233,7 +278,6 @@ idup(struct inode *ip)
 void
 ilock(struct inode *ip)
 {
-  struct buf *bp;
   struct disk_inode *dip;
 
   if(ip == 0 || ip->ref < 1)
@@ -245,16 +289,14 @@ ilock(struct inode *ip)
   ip->flags |= I_BUSY;
   release(&icache.lock);
 
-  if(!(ip->flags & I_VALID)){
-    bp = bread(ip->dev, IBLOCK(ip->inum));
-    dip = (struct disk_inode*)bp->data + ip->inum%IPB;
+  if(!(ip->flags & I_VALID)) {
+    dip = imapget(ip->dev, ip->inum);
     ip->type = dip->type;
     ip->major = dip->major;
     ip->minor = dip->minor;
     ip->nlink = dip->nlink;
     ip->size = dip->size;
     memmove(ip->addrs, dip->addrs, sizeof(ip->addrs));
-    brelse(bp);
     ip->flags |= I_VALID;
     if(ip->type == 0)
       panic("ilock: no type");

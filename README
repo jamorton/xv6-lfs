@@ -5,6 +5,7 @@ Jon Morton, 2011.
 current limitations:
         - only one inode per block. this greatly simplifies the imap.
         - the imap can only be one block long (1024 inodes).
+        - bmap only maps with INDIRECT_LEVELS == 2
 
 implementation order, as time allows:
         [ ] mkfs
