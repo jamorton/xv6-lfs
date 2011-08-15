@@ -25,7 +25,7 @@ int fsd;
 struct disk_superblock sb;
 
 block_t imap[MAX_INODES];
-static block_t cur_block = 2; // 0/1 reserved for boot/superblock
+static block_t cur_block = 1; // 0 reserved for superblock
 static inode_t cur_inode = 0;
 static uint seg_nblocks = 0;
 
@@ -101,13 +101,11 @@ int main(int argc, char * argv[])
 	char buf[BSIZE];
 	bzero(buf, BSIZE);
 
-	bwrite(0, buf);
-
 	sb.imap = imap_block;
 	sb.nblocks = cur_block;
 	sb.ninodes = cur_inode;
 	memcpy(buf, &sb, sizeof(sb));
-	bwrite(1, buf);
+	bwrite(0, buf);
 
 	close(fsd);
 
@@ -135,7 +133,8 @@ block_t balloc(void)
 	return bret;
 }
 
-#define FLOC(a) ((a) * BSIZE)
+// 0-512 is boot sector
+#define FLOC(a) ((a) * BSIZE + 512)
 
 void bread(block_t addr, void * buf)
 {
