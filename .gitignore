@@ -1,3 +1,15 @@
+bootblock
+bootother
+*.out
+kernel
+mkfs
+initcode
+vectors.S
+_*
+*.diff
+*.sym
+*.asm
+*.o
 *.d
 */#*#
 *.img
