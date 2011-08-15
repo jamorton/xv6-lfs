@@ -26,7 +26,7 @@ struct disk_superblock sb;
 
 block_t imap[MAX_INODES];
 static block_t cur_block = 1; // 0 reserved for superblock
-static inode_t cur_inode = 0;
+static inode_t cur_inode = 1;
 static uint seg_nblocks = 0;
 
 // block funcs
@@ -56,8 +56,8 @@ int main(int argc, char * argv[])
 	}
 	
 	inode_t rootino = ialloc(T_DIR);
-	
 	struct dirent de;
+
 	bzero(&de, sizeof(de));
 	de.inum = rootino;
 	strcpy(de.name, ".");
@@ -122,8 +122,6 @@ block_t balloc(void)
 
 	// segment is full.
 	if (++seg_nblocks >= SEGDATABLOCKS) {
-		printf("full segment at %u\n", cur_block);
-		printf("  start: %u\n", cur_block - SEGDATABLOCKS);
 		seg_nblocks = 0;
 		sb.segment = cur_block - SEGDATABLOCKS;
 		sb.nsegs++;
@@ -160,9 +158,8 @@ inode_t ialloc(short type)
 	ip->size = 0;
 
 	block_t nb = balloc();
-	printf("nb %u\n", nb);
 	bwrite(nb, ip);
-	imap[cur_inode] = nb;
+	imap[cur_inode - 1] = nb;
 	free(ip);
 
 	return cur_inode++;
@@ -173,23 +170,21 @@ void iwrite(inode_t i, struct disk_inode * di)
 	char buf[BSIZE];
 	bzero(buf, BSIZE);
 	*((struct disk_inode *)buf) = *di;
-	bwrite(imap[i], buf);
+	bwrite(imap[i - 1], buf);
 }
 
 void iread(inode_t i, struct disk_inode * di)
 {
 	char buf[BSIZE];
 	bzero(buf, BSIZE);
-	bread(imap[i], buf);
+	bread(imap[i - 1], buf);
 	*di = *((struct disk_inode *)buf);
 }
 
-block_t append_block(block_t * addrs, void * data, uint off, uint len)
+block_t data_block(block_t * addrs, uint off)
 {
-	block_t bnext;
-
-	// find indirection level to start at
-	uint bn = off / BSIZE, cnt = 0, level = 0;
+	const uint bn = off / BSIZE;
+	uint cnt = 0, level = 0;
 	while (1) {
 		cnt += INDIRECT_SIZE(level);
 		if (cnt > bn)
@@ -197,24 +192,18 @@ block_t append_block(block_t * addrs, void * data, uint off, uint len)
 		off -= INDIRECT_SIZE(level++) * BSIZE;
 	}
 
-	block_t * level_addrs;
+	uint addr_off;
+	if (level == 0)
+		addr_off = off / BSIZE;
+	else
+		addr_off  = level + NDIRECT - 1;
 
-	if (level != 0) {
-		level_addrs = malloc(BSIZE);
-		uint a = level + NDIRECT - 1;
-		if (addrs[a] == 0)
-			addrs[a] = balloc();
-		bnext = addrs[a];
-		bread(addrs[a], level_addrs);
-	} else {
-		uint nn = off / BSIZE;
-		if (addrs[nn] == 0)
-			addrs[nn] = balloc();
-		bnext = addrs[nn];
-		off = off % BSIZE;
-		goto append_block_final;
-	}
+	if (addrs[addr_off] == 0)
+		addrs[addr_off] = balloc();
 
+	block_t bnext = addrs[addr_off];
+	block_t * level_addrs = malloc(BSIZE);
+	
 	uint l;
 	for (l = level; l > 0; l--) {
 		uint c = l - 1, div = BSIZE;
@@ -233,32 +222,34 @@ block_t append_block(block_t * addrs, void * data, uint off, uint len)
 
 	free(level_addrs);
 
-append_block_final:
-	assert(off + len <= BSIZE);
-	char * out = malloc(BSIZE);
-	bread(bnext, out);
-	memcpy(out + off, data + off, len);
-	bwrite(bnext, out);
-	free(out);
-	
-	return 0;
-}
+	return bnext;}
+
 
 void iappend(inode_t i, void * data, uint len)
 {
-	struct disk_inode * di = malloc(sizeof(struct disk_inode));
-	iread(i, di);
+	char out[BSIZE];
 
-	uint wr = di->size;
+
+	struct disk_inode di;
+	iread(i, &di);
+
+	uint wr = di.size;
 	uint max = wr + len;
+	uint data_off = 0;
+
 	while (wr < max) {
-		uint st  = MIN(BSIZE - wr % BSIZE, max - wr);
-		append_block(di->addrs, data, wr, st);
-		wr += st;
+		uint len  = MIN(BSIZE - wr % BSIZE, max - wr);
+		block_t db = data_block(di.addrs, wr);
+
+		bread(db, out);
+		memcpy(out + wr % BSIZE, data + data_off, len);
+		bwrite(db, out);
+		
+		wr += len;
+		data_off += len;
 	}
 
-	di->size = wr;
+	di.size = wr;
 
-	iwrite(i, di);
-	free(di);
+	iwrite(i, &di);
 }
