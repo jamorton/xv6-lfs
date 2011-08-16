@@ -1,10 +1,11 @@
 #ifndef __FS_H__
 #define __FS_H__
 
-#define BSIZE (512)
-#define SEGSIZE (1024*1024) // 1mb
+#define BSIZE (2048)
+#define SEGSIZE (1024*512) // 512kb
 #define SEGBLOCKS (SEGSIZE/BSIZE)
-#define SEGDATABLOCKS (SEGBLOCKS-1) // 1 block for seg info
+#define SEGMETABLOCKS (1)
+#define SEGDATABLOCKS (SEGBLOCKS-SEGMETABLOCKS)
 
 // sectors per block
 #define SPB (BSIZE / 512)

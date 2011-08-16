@@ -23,14 +23,14 @@ int fsd;
 struct disk_superblock sb;
 
 block_t imap[MAX_INODES];
-static block_t cur_block = 1; // 0 reserved for superblock
+static block_t cur_block = 1 + SEGMETABLOCKS; // 0 for superblock
 static inode_t cur_inode = 1; // inode 0 means null
-static uint seg_nblocks = 0;
+static uint seg_block = 0;
 
 // block funcs
 block_t balloc(void);
 void bwrite(block_t, const void *);
-block_t data_block(block_t * addrs, uint off)
+block_t data_block(block_t *, uint);
 
 // inode funcs
 inode_t ialloc(short);
@@ -41,6 +41,8 @@ void iappend(inode_t, void *, uint);
 int main(int argc, char * argv[])
 {
 	bzero(&sb, sizeof(sb));
+	sb.nsegs = 0;
+	sb.segment = 0;
 
 	if (argc < 2) {
 		printf("Usage: mkfs [image file] [input files...]\n");
@@ -99,8 +101,6 @@ int main(int argc, char * argv[])
 	char buf[BSIZE];
 	bzero(buf, BSIZE);
 
-	sb.nsegs = 0; // XXX
-	sb.segment = 0; // XXX
 	sb.imap = imap_block;
 	sb.nblocks = cur_block;
 	sb.ninodes = cur_inode;
@@ -121,11 +121,17 @@ block_t balloc(void)
 	bwrite(bret, zeroes);
 
 	// segment is full.
-	if (++seg_nblocks >= SEGDATABLOCKS) {
-		seg_nblocks = 0;
-		sb.segment = cur_block - SEGDATABLOCKS;
+	if (++seg_block == SEGDATABLOCKS) {
+		seg_block = 0;
+		sb.segment = cur_block - SEGBLOCKS;
 		sb.nsegs++;
-		bwrite(cur_block++, zeroes);
+
+		// segment metadata blocks, write zeroes for now
+		uint k;
+		for (k = 0; k < SEGMETABLOCKS; k++)
+			bwrite(sb.segment + k, zeroes);
+
+		cur_block += SEGMETABLOCKS;
 	}
 
 	return bret;
@@ -197,11 +203,7 @@ block_t data_block(block_t * addrs, uint off)
 		off -= INDIRECT_SIZE(level++) * BSIZE;
 	}
 
-	uint addr_off;
-	if (level == 0)
-		addr_off = off / BSIZE;
-	else
-		addr_off  = level + NDIRECT - 1;
+	uint addr_off = (level == 0 ? (off / BSIZE) : (level + NDIRECT - 1));
 
 	if (addrs[addr_off] == 0)
 		addrs[addr_off] = balloc();
@@ -214,6 +216,7 @@ block_t data_block(block_t * addrs, uint off)
 		uint c = l - 1, div = BSIZE;
 		while (c--)
 			div *= NINDIRECT;
+
 		block_t n = off / div;
 		off = off % div;
 
