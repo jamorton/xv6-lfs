@@ -1,3 +1,5 @@
+.gdbinit
+diff.txt
 bootblock
 bootother
 *.out
