@@ -32,7 +32,6 @@ readsb(int dev, struct disk_superblock *sb)
   bp = bread(dev, 0);
   memmove(sb, bp->data, sizeof(*sb));
   brelse(bp);
-  cprintf("Superblock: imap %u, nblocks %u ninodes %u\n", sb->imap, sb->nblocks, sb->ninodes); 
 }
 
 // Zero a block.
@@ -83,6 +82,7 @@ balloc(uint dev)
 static void
 bfree(int dev, block_t b)
 {
+  panic("bfree");
 /*
   struct buf *bp;
   struct disk_superblock sb;
@@ -157,8 +157,6 @@ readimap(int dev, block_t * imap)
   bp = bread(dev, sb.imap);
   memmove(imap, bp->data, BSIZE);
   brelse(bp);
-  
-  cprintf("readimap: block %u imap[0] %u imap[1] %u\n", sb.imap, imap[0], imap[1]);
 }
 
 
@@ -168,16 +166,14 @@ imapget(int dev, uint inum, struct disk_inode * out)
   struct buf * bp;
   block_t imap[MAX_INODES];
 
-  readimap(dev, imap);
+  readimap(dev, &imap[0]);
 
   if (imap[inum-1] == 0)
     panic("imapget: no imap number");
 
   bp = bread(dev, imap[inum-1]);
-  
   memmove(out, bp->data, sizeof(struct disk_inode));
-  
-  cprintf("imapget: inum %u block %u size %u addrs[0] %u addrs[1] %u\n", inum, imap[inum-1], out->size, out->addrs[0], out->addrs[1]);
+  brelse(bp);
 }
 
 static struct inode* iget(uint dev, uint inum);
@@ -186,7 +182,6 @@ static struct inode* iget(uint dev, uint inum);
 struct inode*
 ialloc(uint dev, short type)
 {
-
   panic("ialloc: not implemented");
 
   /*
@@ -377,6 +372,7 @@ bmap(struct inode *ip, uint bn)
     return addr;
   }
   bn -= NDIRECT;
+  panic("indirect");
 
   if(bn < NINDIRECT){
     // Load indirect block, allocating if necessary.
@@ -403,6 +399,7 @@ bmap(struct inode *ip, uint bn)
 static void
 itrunc(struct inode *ip)
 {
+  panic("itrunc");
   int i, j;
   struct buf *bp;
   uint *a;
@@ -472,6 +469,7 @@ readi(struct inode *ip, char *dst, uint off, uint n)
 int
 writei(struct inode *ip, char *src, uint off, uint n)
 {
+  panic("writei");
   uint tot, m;
   struct buf *bp;
 

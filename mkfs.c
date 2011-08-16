@@ -18,15 +18,13 @@
 #define stat xv6_stat  // avoid clash with host struct stat
 #include "stat.h"
 
-#define DRIVE_SIZE (SEGSIZE * 20) // 20 segment
-
 // global variables
 int fsd;
 struct disk_superblock sb;
 
 block_t imap[MAX_INODES];
 static block_t cur_block = 1; // 0 reserved for superblock
-static inode_t cur_inode = 1;
+static inode_t cur_inode = 1; // inode 0 means null
 static uint seg_nblocks = 0;
 
 // block funcs
@@ -101,6 +99,8 @@ int main(int argc, char * argv[])
 	char buf[BSIZE];
 	bzero(buf, BSIZE);
 
+	sb.nsegs = 0; // XXX
+	sb.segment = 0; // XXX
 	sb.imap = imap_block;
 	sb.nblocks = cur_block;
 	sb.ninodes = cur_inode;
@@ -227,7 +227,8 @@ block_t data_block(block_t * addrs, uint off)
 
 	free(level_addrs);
 
-	return bnext;}
+	return bnext;
+}
 
 
 void iappend(inode_t i, void * data, uint len)
@@ -246,8 +247,7 @@ void iappend(inode_t i, void * data, uint len)
 	while (wr < max) {
 		uint len  = MIN(BSIZE - wr % BSIZE, max - wr);
 		block_t db = data_block(di.addrs, wr);
-		if (db == 2)
-			printf("  db: %u\n  data_off: %u\n  out off: %u\n", db, data_off, wr % BSIZE);
+		printf("  db: %u\n  data_off: %u\n  out off: %u\n", db, data_off, wr % BSIZE);
 
 		bread(db, out);
 		memcpy(out + wr % BSIZE, data + data_off, len);
