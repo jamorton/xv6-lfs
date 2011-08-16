@@ -30,13 +30,13 @@ static uint seg_nblocks = 0;
 // block funcs
 block_t balloc(void);
 void bwrite(block_t, const void *);
+block_t data_block(block_t * addrs, uint off)
 
 // inode funcs
 inode_t ialloc(short);
 void iread(inode_t, struct disk_inode *);
 void iwrite(inode_t, struct disk_inode *);
 void iappend(inode_t, void *, uint);
-block_t append_block(block_t *, void * data, uint off, uint len);
 
 int main(int argc, char * argv[])
 {
@@ -238,8 +238,6 @@ void iappend(inode_t i, void * data, uint len)
 	struct disk_inode di;
 	iread(i, &di);
 
-	printf("iappend %u\n", i);
-
 	uint wr = di.size;
 	uint max = wr + len;
 	uint data_off = 0;
@@ -247,7 +245,6 @@ void iappend(inode_t i, void * data, uint len)
 	while (wr < max) {
 		uint len  = MIN(BSIZE - wr % BSIZE, max - wr);
 		block_t db = data_block(di.addrs, wr);
-		printf("  db: %u\n  data_off: %u\n  out off: %u\n", db, data_off, wr % BSIZE);
 
 		bread(db, out);
 		memcpy(out + wr % BSIZE, data + data_off, len);
