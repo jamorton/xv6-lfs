@@ -152,15 +152,20 @@ inode_t ialloc(short type)
 		printf("Error: inode limit exceeded.\n");
 		exit(1);
 	}
-	struct disk_inode * ip = malloc(BSIZE);
-	ip->type = type;
-	ip->nlink = 1;
-	ip->size = 0;
+	struct disk_inode ip;
+	bzero(&ip, sizeof(ip));
+
+	ip.type = type;
+	ip.nlink = 1;
+	ip.size = 0;
 
 	block_t nb = balloc();
-	bwrite(nb, ip);
+	char buf[BSIZE];
+	bzero(buf, BSIZE);
+
+	memcpy(buf, &ip, sizeof(ip));
+	bwrite(nb, buf);
 	imap[cur_inode - 1] = nb;
-	free(ip);
 
 	return cur_inode++;
 }
@@ -169,7 +174,7 @@ void iwrite(inode_t i, struct disk_inode * di)
 {
 	char buf[BSIZE];
 	bzero(buf, BSIZE);
-	*((struct disk_inode *)buf) = *di;
+	memcpy(buf, di, sizeof(struct disk_inode));
 	bwrite(imap[i - 1], buf);
 }
 
@@ -178,7 +183,7 @@ void iread(inode_t i, struct disk_inode * di)
 	char buf[BSIZE];
 	bzero(buf, BSIZE);
 	bread(imap[i - 1], buf);
-	*di = *((struct disk_inode *)buf);
+	memcpy(di, buf, sizeof(struct disk_inode));
 }
 
 block_t data_block(block_t * addrs, uint off)
@@ -229,9 +234,10 @@ void iappend(inode_t i, void * data, uint len)
 {
 	char out[BSIZE];
 
-
 	struct disk_inode di;
 	iread(i, &di);
+
+	printf("iappend %u\n", i);
 
 	uint wr = di.size;
 	uint max = wr + len;
@@ -240,6 +246,8 @@ void iappend(inode_t i, void * data, uint len)
 	while (wr < max) {
 		uint len  = MIN(BSIZE - wr % BSIZE, max - wr);
 		block_t db = data_block(di.addrs, wr);
+		if (db == 2)
+			printf("  db: %u\n  data_off: %u\n  out off: %u\n", db, data_off, wr % BSIZE);
 
 		bread(db, out);
 		memcpy(out + wr % BSIZE, data + data_off, len);
@@ -249,7 +257,7 @@ void iappend(inode_t i, void * data, uint len)
 		data_off += len;
 	}
 
-	di.size = wr;
+	di.size = max;
 
 	iwrite(i, &di);
 }

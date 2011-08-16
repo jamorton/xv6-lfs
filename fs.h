@@ -85,7 +85,7 @@ struct buf {
 #define B_VALID 0x2  // buffer has been read from disk
 #define B_DIRTY 0x4  // buffer needs to be written to disk
 
-#define ROOTINO 0
+#define ROOTINO 1
 #define ROOTDEV 1
 
 #endif

@@ -32,6 +32,7 @@ readsb(int dev, struct disk_superblock *sb)
   bp = bread(dev, 0);
   memmove(sb, bp->data, sizeof(*sb));
   brelse(bp);
+  cprintf("Superblock: imap %u, nblocks %u ninodes %u\n", sb->imap, sb->nblocks, sb->ninodes); 
 }
 
 // Zero a block.
@@ -50,12 +51,13 @@ bzero(int dev, int bno)
 
 // Blocks. 
 
+ /*
 // Allocate a disk block.
 static uint
 balloc(uint dev)
 {
   panic("balloc not implemented");
-/*
+
   struct buf *bp;
   struct disk_superblock sb;
 
@@ -74,8 +76,8 @@ balloc(uint dev)
     brelse(bp);
   }
   panic("balloc: out of blocks");
-*/
 }
+ */
 
 // Free a disk block.
 static void
@@ -155,20 +157,27 @@ readimap(int dev, block_t * imap)
   bp = bread(dev, sb.imap);
   memmove(imap, bp->data, BSIZE);
   brelse(bp);
+  
+  cprintf("readimap: block %u imap[0] %u imap[1] %u\n", sb.imap, imap[0], imap[1]);
 }
 
-static struct disk_inode *
-imapget(int dev, uint inum)
+
+void
+imapget(int dev, uint inum, struct disk_inode * out)
 {
   struct buf * bp;
   block_t imap[MAX_INODES];
 
   readimap(dev, imap);
 
-  if (imap[inum] == 0)
+  if (imap[inum-1] == 0)
     panic("imapget: no imap number");
-  bp = bread(dev, imap[inum]);
-  return ((struct disk_inode *)bp->data);
+
+  bp = bread(dev, imap[inum-1]);
+  
+  memmove(out, bp->data, sizeof(struct disk_inode));
+  
+  cprintf("imapget: inum %u block %u size %u addrs[0] %u addrs[1] %u\n", inum, imap[inum-1], out->size, out->addrs[0], out->addrs[1]);
 }
 
 static struct inode* iget(uint dev, uint inum);
@@ -278,7 +287,7 @@ idup(struct inode *ip)
 void
 ilock(struct inode *ip)
 {
-  struct disk_inode *dip;
+  struct disk_inode dip;
 
   if(ip == 0 || ip->ref < 1)
     panic("ilock");
@@ -290,13 +299,13 @@ ilock(struct inode *ip)
   release(&icache.lock);
 
   if(!(ip->flags & I_VALID)) {
-    dip = imapget(ip->dev, ip->inum);
-    ip->type = dip->type;
-    ip->major = dip->major;
-    ip->minor = dip->minor;
-    ip->nlink = dip->nlink;
-    ip->size = dip->size;
-    memmove(ip->addrs, dip->addrs, sizeof(ip->addrs));
+    imapget(ip->dev, ip->inum, &dip);
+    ip->type = dip.type;
+    ip->major = dip.major;
+    ip->minor = dip.minor;
+    ip->nlink = dip.nlink;
+    ip->size = dip.size;
+    memmove(ip->addrs, dip.addrs, sizeof(ip->addrs));
     ip->flags |= I_VALID;
     if(ip->type == 0)
       panic("ilock: no type");
@@ -363,7 +372,8 @@ bmap(struct inode *ip, uint bn)
 
   if(bn < NDIRECT){
     if((addr = ip->addrs[bn]) == 0)
-      ip->addrs[bn] = addr = balloc(ip->dev);
+      panic("bmap");
+      //ip->addrs[bn] = addr = balloc(ip->dev);
     return addr;
   }
   bn -= NDIRECT;
@@ -371,12 +381,14 @@ bmap(struct inode *ip, uint bn)
   if(bn < NINDIRECT){
     // Load indirect block, allocating if necessary.
     if((addr = ip->addrs[NDIRECT]) == 0)
-      ip->addrs[NDIRECT] = addr = balloc(ip->dev);
+      panic("bmap");
+      //ip->addrs[NDIRECT] = addr = balloc(ip->dev);
     bp = bread(ip->dev, addr);
     a = (uint*)bp->data;
     if((addr = a[bn]) == 0){
-      a[bn] = addr = balloc(ip->dev);
-      bwrite(bp);
+      panic("bmap");
+      //a[bn] = addr = balloc(ip->dev);
+      //bwrite(bp);
     }
     brelse(bp);
     return addr;
