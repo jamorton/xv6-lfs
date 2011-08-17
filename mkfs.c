@@ -31,6 +31,7 @@ static uint seg_block = 0;
 block_t balloc(void);
 void bwrite(block_t, const void *);
 block_t data_block(block_t *, uint);
+void seg_finish(block_t);
 
 // inode funcs
 inode_t ialloc(short);
@@ -108,9 +109,22 @@ int main(int argc, char * argv[])
 	memcpy(buf, &sb, sizeof(sb));
 	bwrite(0, buf);
 
+	if (seg_block != 0)
+		seg_finish(sb.segmet + SEGBLOCKS); 
+
 	close(fsd);
 
 	return 0;
+}
+
+void seg_finish(block_t start)
+{
+	char zeroes[BSIZE];
+	bzero(zeroes, BSIZE);
+
+	uint k;
+	for (k = 0; k < SEGMETABLOCKS; k++)
+		bwrite(start + k, zeroes);
 }
 
 block_t balloc(void)
@@ -127,10 +141,7 @@ block_t balloc(void)
 		sb.segment = cur_block - SEGBLOCKS;
 		sb.nsegs++;
 
-		// segment metadata blocks, write zeroes for now
-		uint k;
-		for (k = 0; k < SEGMETABLOCKS; k++)
-			bwrite(sb.segment + k, zeroes);
+		seg_finish(sb.segment);
 
 		cur_block += SEGMETABLOCKS;
 	}
