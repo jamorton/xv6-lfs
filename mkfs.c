@@ -104,6 +104,7 @@ int main(int argc, char * argv[])
 	sb.imap = imap_block;
 	sb.nblocks = cur_block;
 	sb.ninodes = cur_inode;
+	sb.next = cur_block;
 	memcpy(buf, &sb, sizeof(sb));
 	bwrite(0, buf);
 
