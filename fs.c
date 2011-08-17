@@ -24,7 +24,7 @@
 static void itrunc(struct inode*);
 
 // Read the super block.
-static void
+void
 readsb(int dev, struct disk_superblock *sb)
 {
   struct buf *bp;
