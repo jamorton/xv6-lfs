@@ -26,7 +26,7 @@ struct disk_superblock {
 	block_t imap; // imap block
 	uint ninodes;
 	uint nblocks;
-	uint next;
+	uint next; // next empty block
 };
 
 #define DISK_INODE_DATA 12 // size of disk_inode excluding addrs

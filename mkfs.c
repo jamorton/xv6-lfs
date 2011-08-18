@@ -106,11 +106,12 @@ int main(int argc, char * argv[])
 	sb.nblocks = cur_block;
 	sb.ninodes = cur_inode;
 	sb.next = cur_block;
+
 	memcpy(buf, &sb, sizeof(sb));
 	bwrite(0, buf);
 
 	if (seg_block != 0)
-		seg_finish(sb.segmet + SEGBLOCKS); 
+		seg_finish(sb.segment + SEGBLOCKS); 
 
 	close(fsd);
 
@@ -138,7 +139,7 @@ block_t balloc(void)
 	// segment is full.
 	if (++seg_block == SEGDATABLOCKS) {
 		seg_block = 0;
-		sb.segment = cur_block - SEGBLOCKS;
+		sb.segment = cur_block - SEGDATABLOCKS;
 		sb.nsegs++;
 
 		seg_finish(sb.segment);
@@ -183,7 +184,7 @@ inode_t ialloc(short type)
 
 	memcpy(buf, &ip, sizeof(ip));
 	bwrite(nb, buf);
-	imap[cur_inode - 1] = nb;
+	imap[cur_inode] = nb;
 
 	return cur_inode++;
 }
@@ -193,14 +194,14 @@ void iwrite(inode_t i, struct disk_inode * di)
 	char buf[BSIZE];
 	bzero(buf, BSIZE);
 	memcpy(buf, di, sizeof(struct disk_inode));
-	bwrite(imap[i - 1], buf);
+	bwrite(imap[i], buf);
 }
 
 void iread(inode_t i, struct disk_inode * di)
 {
 	char buf[BSIZE];
 	bzero(buf, BSIZE);
-	bread(imap[i - 1], buf);
+	bread(imap[i], buf);
 	memcpy(di, buf, sizeof(struct disk_inode));
 }
 
