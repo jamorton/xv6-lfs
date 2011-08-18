@@ -6,12 +6,14 @@ struct pipe;
 struct proc;
 struct spinlock;
 struct stat;
+struct disk_superblock;
 
 // bio.c
 void            binit(void);
 struct buf*     bread(uint, uint);
 void            brelse(struct buf*);
-void            bwrite(struct buf*);
+void            bwrite_fixed(struct buf*);
+uint            bwrite(void*);
 
 // console.c
 void            consoleinit(void);
@@ -33,6 +35,7 @@ int             filewrite(struct file*, char*, int n);
 
 // fs.c
 void            readsb(int, struct disk_superblock*);
+void            writesb(int, struct disk_superblock*);
 int             dirlink(struct inode*, char*, uint);
 struct inode*   dirlookup(struct inode*, char*, uint*);
 struct inode*   ialloc(uint, short);

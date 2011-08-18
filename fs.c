@@ -34,73 +34,21 @@ readsb(int dev, struct disk_superblock *sb)
   brelse(bp);
 }
 
-// Zero a block.
-/*
-static void
-bzero(int dev, int bno)
+void
+writesb(int dev, struct disk_superblock *sb)
 {
   struct buf *bp;
-  
-  bp = bread(dev, bno);
-  memset(bp->data, 0, BSIZE);
-  bwrite(bp);
+  bp = bread(dev, 0);
+  memmove(bp->data, sb, sizeof(*sb));
+  bwrite_fixed(bp);
   brelse(bp);
 }
-*/
-
-// Blocks. 
-
- /*
-// Allocate a disk block.
-static uint
-balloc(uint dev)
-{
-  panic("balloc not implemented");
-
-  struct buf *bp;
-  struct disk_superblock sb;
-
-  readsb(dev, &sb);
-  for(b = 0; b < sb.size; b += BPB){
-    bp = bread(dev, BBLOCK(b, sb.ninodes));
-    for(bi = 0; bi < BPB; bi++){
-      m = 1 << (bi % 8);
-      if((bp->data[bi/8] & m) == 0){  // Is block free?
-        bp->data[bi/8] |= m;  // Mark block in use on disk.
-        bwrite(bp);
-        brelse(bp);
-        return b + bi;
-      }
-    }
-    brelse(bp);
-  }
-  panic("balloc: out of blocks");
-}
- */
 
 // Free a disk block.
 static void
 bfree(int dev, block_t b)
 {
-  panic("bfree");
-/*
-  struct buf *bp;
-  struct disk_superblock sb;
-  int bi, m;
-
-  bzero(dev, b);
-
-  readsb(dev, &sb);
-  bp = bread(dev, BBLOCK(b, sb.ninodes));
-  bi = b % BPB;
-  m = 1 << (bi % 8);
-  if((bp->data[bi/8] & m) == 0)
-    panic("freeing free block");
-  bp->data[bi/8] &= ~m;  // Mark block free on disk.
-  bwrite(bp);
-  brelse(bp);
-*/
-
+  cprintf("free: no implemented\n");
 }
 
 // Inodes.
@@ -159,6 +107,14 @@ readimap(int dev, block_t * imap)
   brelse(bp);
 }
 
+static void
+writeimap(int dev, block_t * imap)
+{
+  struct disk_superblock sb;
+  readsb(dev, &sb);
+  sb.imap = bwrite(imap);
+  writesb(dev, &sb);
+}
 
 void
 imapget(int dev, uint inum, struct disk_inode * out)
@@ -168,10 +124,12 @@ imapget(int dev, uint inum, struct disk_inode * out)
 
   readimap(dev, &imap[0]);
 
-  if (imap[inum-1] == 0)
+  cprintf("inum %u\n", inum);
+
+  if (imap[inum] == 0)
     panic("imapget: no imap number");
 
-  bp = bread(dev, imap[inum-1]);
+  bp = bread(dev, imap[inum]);
   memmove(out, bp->data, sizeof(struct disk_inode));
   brelse(bp);
 }
@@ -182,32 +140,23 @@ static struct inode* iget(uint dev, uint inum);
 struct inode*
 ialloc(uint dev, short type)
 {
-  panic("ialloc: not implemented");
-
-  /*
-  int inum;
-  struct buf *bp;
-  struct disk_inode *dip;
   struct disk_superblock sb;
   block_t imap[MAX_INODES];
+  uchar data[BSIZE];
+  memset(data, 0, BSIZE);
+  struct disk_inode * dip = (struct disk_inode *)(&data[0]);
 
   readsb(dev, &sb);
-  readimap(dev, imap);
 
-  for(inum = 1; inum < sb.ninodes; inum++){  // loop over inode blocks
-    bp = bread(dev, IBLOCK(inum));
-    dip = (struct disk_inode*)bp->data + inum%IPB;
-    if(dip->type == 0){  // a free inode
-      memset(dip, 0, sizeof(*dip));
-      dip->type = type;
-      bwrite(bp);   // mark it allocated on the disk
-      brelse(bp);
-      return iget(dev, inum);
-    }
-    brelse(bp);
-  }
-  panic("ialloc: no inodes");
-  */
+  dip->type = type;
+  inode_t inum = sb.ninodes++;
+
+  readimap(dev, imap);
+  imap[inum] = bwrite(data);
+  writeimap(dev, imap);
+  writesb(dev, &sb);
+
+  return iget(dev, inum);
 }
 
 // Copy inode, which has changed, from memory to disk.
@@ -215,21 +164,21 @@ void
 iupdate(struct inode *ip)
 {
   panic("iupdate: not implemented");
-  /*
-  struct buf *bp;
-  struct disk_inode *dip;
+  
+  struct disk_inode dip;
+  uchar data[BSIZE];
+  block_t imap[MAX_INODES];
+  readimap(ip->dev, &imap[0]);
 
-  bp = bread(ip->dev, IBLOCK(ip->inum));
-  dip = (struct disk_inode*)bp->data + ip->inum%IPB;
-  dip->type = ip->type;
-  dip->major = ip->major;
-  dip->minor = ip->minor;
-  dip->nlink = ip->nlink;
-  dip->size = ip->size;
-  memmove(dip->addrs, ip->addrs, sizeof(ip->addrs));
-  bwrite(bp);
-  brelse(bp);
-  */
+  dip.type = ip->type;
+  dip.major = ip->major;
+  dip.minor = ip->minor;
+  dip.nlink = ip->nlink;
+  dip.size = ip->size;
+  memmove(dip.addrs, ip->addrs, sizeof(ip->addrs));
+  memmove(data, &dip, sizeof(dip));
+  imap[ip->inum] = bwrite(data);
+  writeimap(ip->dev, &imap[0]);
 }
 
 // Find the inode with number inum on device dev
