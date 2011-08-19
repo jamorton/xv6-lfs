@@ -184,7 +184,7 @@ mkfs: mkfs.c fs.h
 	gcc -m32 -Werror -Wall -o mkfs mkfs.c
 
 fs.img: mkfs README $(UPROGS)
-	./mkfs fs.img README test10mb $(UPROGS)
+	./mkfs fs.img README $(UPROGS)
 
 #-include *.d
 

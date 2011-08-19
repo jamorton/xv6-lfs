@@ -108,7 +108,7 @@ int main(int argc, char * argv[])
 	sb.next = cur_block;
 
 	memcpy(buf, &sb, sizeof(sb));
-	bwrite(0, buf);
+	bwrite(1, buf);
 
 	if (seg_block != 0)
 		seg_finish(sb.segment + SEGBLOCKS); 
@@ -151,7 +151,7 @@ block_t balloc(void)
 }
 
 // 0-512 is boot sector
-#define FLOC(a) ((a) * BSIZE + 512)
+#define FLOC(a) (B2S(a) * 512)
 
 void bread(block_t addr, void * buf)
 {

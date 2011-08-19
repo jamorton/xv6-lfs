@@ -10,10 +10,10 @@ struct disk_superblock;
 
 // bio.c
 void            binit(void);
+struct buf*     balloc(uint);
 struct buf*     bread(uint, uint);
 void            brelse(struct buf*);
-void            bwrite_fixed(struct buf*);
-uint            bwrite(void*);
+uint            bwrite(struct buf*);
 
 // console.c
 void            consoleinit(void);

@@ -12,10 +12,10 @@
 #define IS_BLOCK_SECTOR(a) (((a) & (SPB - 1)) == 0) // is divisible by SPB
 
 // block to sector, sector to block
-// block 0 is sector 1, block 1 is sector 9, etc.
+// block 0 is invalid, block 1 sector 1, block 2 is sector 9, etc.
 // sector 0 is reserved for the bootloader
-#define B2S(b) ((b) * SPB + 1)
-#define S2B(s) (((s) - 1) / SPB)
+#define B2S(b) (((b) - 1) * SPB + 1)
+#define S2B(s) (((s) - 1) / SPB + 1)
 
 typedef uint block_t;
 typedef uint inode_t;
