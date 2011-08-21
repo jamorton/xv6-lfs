@@ -24,23 +24,27 @@
 static void itrunc(struct inode*);
 
 // Read the super block.
-void
-readsb(int dev, struct disk_superblock *sb)
+struct disk_superblock *
+getsb(void)
 {
-  struct buf *bp;
-  
-  bp = bread(dev, 0);
-  memmove(sb, bp->data, sizeof(*sb));
-  brelse(bp);
+  static struct disk_superblock _sb;
+  if (_sb.nblocks == 0) {
+    struct buf *bp;
+    bp = bread(ROOTDEV, 1);
+    memmove(&_sb, bp->data, sizeof(_sb));
+    brelse(bp);
+  }
+  return &_sb;
 }
 
 void
-writesb(int dev, struct disk_superblock *sb)
+flushsb(void)
 {
+  struct disk_superblock * sb = getsb();
   struct buf *bp;
-  bp = bread(dev, 0);
+  bp = bread(ROOTDEV, 1);
   memmove(bp->data, sb, sizeof(*sb));
-  bwrite_fixed(bp);
+  bwrite(bp);
   brelse(bp);
 }
 
@@ -95,43 +99,32 @@ iinit(void)
   initlock(&icache.lock, "icache");
 }
 
-static void
-readimap(int dev, block_t * imap)
+inode_t imapalloc(int dev)
 {
-  struct buf * bp;
-  struct disk_superblock sb;
-  readsb(dev, &sb);
+  return getsb()->ninodes++;
+}
 
-  bp = bread(dev, sb.imap);
-  memmove(imap, bp->data, BSIZE);
+void imapset(int dev, inode_t inum, block_t new)
+{
+  struct buf * bp = bread(dev, getsb()->imap);
+  block_t * imap = (block_t *)bp->data;
+  imap[inum] = new;
+  bwrite(bp);
   brelse(bp);
 }
 
-static void
-writeimap(int dev, block_t * imap)
+void imapget(int dev, uint inum, struct disk_inode * out)
 {
-  struct disk_superblock sb;
-  readsb(dev, &sb);
-  sb.imap = bwrite(imap);
-  writesb(dev, &sb);
-}
-
-void
-imapget(int dev, uint inum, struct disk_inode * out)
-{
-  struct buf * bp;
-  block_t imap[MAX_INODES];
-
-  readimap(dev, &imap[0]);
-
-  cprintf("inum %u\n", inum);
-
+  struct buf * bp1 = bread(dev, getsb()->imap);
+  block_t * imap = (block_t *)bp->data;
+  
   if (imap[inum] == 0)
     panic("imapget: no imap number");
 
-  bp = bread(dev, imap[inum]);
-  memmove(out, bp->data, sizeof(struct disk_inode));
-  brelse(bp);
+  struct buf * bp2 = bread(dev, imap[inum]);
+  memmove(out, bp2->data, sizeof(*out));
+  brelse(bp2);
+  brelse(bp1);
 }
 
 static struct inode* iget(uint dev, uint inum);
@@ -140,31 +133,17 @@ static struct inode* iget(uint dev, uint inum);
 struct inode*
 ialloc(uint dev, short type)
 {
-  struct disk_superblock sb;
-  block_t imap[MAX_INODES];
-  uchar data[BSIZE];
-  memset(data, 0, BSIZE);
-  struct disk_inode * dip = (struct disk_inode *)(&data[0]);
-
-  readsb(dev, &sb);
-
+  struct buf * bp = balloc(dev);
+  struct disk_inode * dip = (struct disk_inode *)(bp->data);
   dip->type = type;
-  inode_t inum = sb.ninodes++;
 
-  readimap(dev, imap);
-  imap[inum] = bwrite(data);
-  writeimap(dev, imap);
-  writesb(dev, &sb);
-
-  return iget(dev, inum);
+  return iget(dev, imapset(dev, bwrite(bp)));
 }
 
 // Copy inode, which has changed, from memory to disk.
 void
 iupdate(struct inode *ip)
 {
-  panic("iupdate: not implemented");
-  
   struct disk_inode dip;
   uchar data[BSIZE];
   block_t imap[MAX_INODES];

@@ -146,12 +146,11 @@ bwrite(struct buf *b)
 
   acquire(&seg.lock);
 
-  // FIXME: shouldn't read superblock here...
-  if (seg.start == 0) {
-    struct disk_superblock sb;
-    readsb(b->dev, &sb);
-    seg.start = sb.next;
-  }
+  struct disk_superblock * sb = getsb();
+
+  // initialize new seg
+  if (seg.start == 0)
+    seg.start = sb->next;
 
   if ((b->flags & B_DIRTY) != 0)
     return b->block;
@@ -175,13 +174,11 @@ bwrite(struct buf *b)
     for (k = 0; k < SEGDATABLOCKS; k++)
       iderw(seg.blocks[k]);
     
-    struct disk_superblock sb;
-    readsb(b->dev, &sb);
-    sb.segment = seg.start;
-    sb.next += SEGBLOCKS;
-    sb.nsegs++;
-    sb.nblocks += SEGBLOCKS;
-    writesb(b->dev, &sb);
+    sb->segment = seg.start;
+    sb->next += SEGBLOCKS;
+    sb->nsegs++;
+    sb->nblocks += SEGBLOCKS;
+    flushsb();
 
     memset(seg.blocks, 0, sizeof(seg.blocks));
     seg.count = seg.start = 0;
