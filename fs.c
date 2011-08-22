@@ -99,7 +99,7 @@ iinit(void)
   initlock(&icache.lock, "icache");
 }
 
-inode_t imapalloc(int dev)
+inode_t imapalloc(void)
 {
   return getsb()->ninodes++;
 }
@@ -109,22 +109,22 @@ void imapset(int dev, inode_t inum, block_t new)
   struct buf * bp = bread(dev, getsb()->imap);
   block_t * imap = (block_t *)bp->data;
   imap[inum] = new;
-  bwrite(bp);
+  getsb()->imap = bwrite(bp);
   brelse(bp);
 }
 
 void imapget(int dev, uint inum, struct disk_inode * out)
 {
-  struct buf * bp1 = bread(dev, getsb()->imap);
-  block_t * imap = (block_t *)bp->data;
-  
-  if (imap[inum] == 0)
+  struct buf * bp  = bread(dev, getsb()->imap);
+  block_t b = *((block_t *)bp->data + inum); // imap[inum]
+  brelse(bp);
+
+  if (b == 0)
     panic("imapget: no imap number");
 
-  struct buf * bp2 = bread(dev, imap[inum]);
-  memmove(out, bp2->data, sizeof(*out));
-  brelse(bp2);
-  brelse(bp1);
+  bp = bread(dev, b);
+  memmove(out, bp->data, sizeof(*out));
+  brelse(bp);
 }
 
 static struct inode* iget(uint dev, uint inum);
@@ -137,7 +137,10 @@ ialloc(uint dev, short type)
   struct disk_inode * dip = (struct disk_inode *)(bp->data);
   dip->type = type;
 
-  return iget(dev, imapset(dev, bwrite(bp)));
+  inode_t inum = imapalloc();
+  imapset(dev, inum, bwrite(bp));
+  brelse(bp);
+  return iget(dev, inum);
 }
 
 // Copy inode, which has changed, from memory to disk.
@@ -145,19 +148,17 @@ void
 iupdate(struct inode *ip)
 {
   struct disk_inode dip;
-  uchar data[BSIZE];
-  block_t imap[MAX_INODES];
-  readimap(ip->dev, &imap[0]);
 
   dip.type = ip->type;
   dip.major = ip->major;
   dip.minor = ip->minor;
   dip.nlink = ip->nlink;
   dip.size = ip->size;
+
+  struct buf * bp = balloc(ip->dev);
   memmove(dip.addrs, ip->addrs, sizeof(ip->addrs));
-  memmove(data, &dip, sizeof(dip));
-  imap[ip->inum] = bwrite(data);
-  writeimap(ip->dev, &imap[0]);
+  memmove(bp->data, &dip, sizeof(dip));
+  imapset(ip->dev, ip->inum, bwrite(bp));
 }
 
 // Find the inode with number inum on device dev
@@ -388,6 +389,7 @@ readi(struct inode *ip, char *dst, uint off, uint n)
     bp = bread(ip->dev, bmap(ip, off/BSIZE));
     m = min(n - tot, BSIZE - off%BSIZE);
     memmove(dst, bp->data + off%BSIZE, m);
+    cprintf(" readi: %d\n", *((int*)dst));
     brelse(bp);
   }
   return n;

@@ -57,6 +57,7 @@ binit(void)
     b->next = bcache.head.next;
     b->prev = &bcache.head;
     b->dev = -1;
+    b->flags = 0;
     bcache.head.next->prev = b;
     bcache.head.next = b;
   }
@@ -111,7 +112,7 @@ loop:
   
   release(&bcache.lock);
 
-  if (block > seg.start && block < seg.start + SEGBLOCKS)
+  if (seg.start !=0 && block > seg.start && block < seg.start + SEGBLOCKS)
     panic("bget: block in new seg range.");
   
   b = balloc(dev);
@@ -152,8 +153,10 @@ bwrite(struct buf *b)
   if (seg.start == 0)
     seg.start = sb->next;
 
-  if ((b->flags & B_DIRTY) != 0)
+  if ((b->flags & B_DIRTY) != 0) {
+    release(&seg.lock);
     return b->block;
+  }
 
   seg.blocks[seg.count] = b;
   b->block = seg.start + SEGMETABLOCKS + seg.count++;
