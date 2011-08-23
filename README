@@ -4,13 +4,13 @@ Jon Morton, 2011.
 
 current limitations:
         - only one inode per block. this greatly simplifies the imap.
-        - the imap can only be one block long (1024 inodes).
-        - bmap only maps with INDIRECT_LEVELS == 2
+        - the imap can only be one block long.
+        - writing to inodes cannot extend into indirect levels.
 
 implementation order, as time allows:
-        [ ] mkfs
-        [ ] read-only lfs
-        [ ] segment writing
+        [x] mkfs
+        [x] read-only lfs
+        [x] segment writing
         [ ] segment cleaning
 
 (original xv6 readme is in README.xv6)
