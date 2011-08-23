@@ -27,20 +27,35 @@
 #include "spinlock.h"
 #include "fs.h"
 
+#define BUFSIZE NBUF + SEGBLOCKS
+
 struct {
   struct spinlock lock;
-  struct buf buf[NBUF + SEGBLOCKS];
+  struct buf buf[BUFSIZE];
   // Linked list of all buffers, through prev/next.
   // head.next is most recently used.
   struct buf head;
 } bcache;
 
 struct {
+  uchar busy; // is writing?
   struct spinlock lock;
   block_t start; // where seg will be written
   uint count; // number of blocks already copied into data
   struct buf * blocks[SEGDATABLOCKS];
 } seg;
+
+static void waitseg(void)
+{
+  if (seg.busy != 1)
+    return;
+  cprintf("SLEEPING\n");
+  acquire(&seg.lock);
+  while (seg.busy == 1)
+    sleep(&seg, &seg.lock);
+  release(&seg.lock);
+  cprintf("WAKING\n");
+}
 
 void
 binit(void)
@@ -53,7 +68,7 @@ binit(void)
   // Create linked list of buffers
   bcache.head.prev = &bcache.head;
   bcache.head.next = &bcache.head;
-  for(b = bcache.buf; b < bcache.buf+NBUF; b++){
+  for(b = bcache.buf; b < bcache.buf+BUFSIZE; b++){
     b->next = bcache.head.next;
     b->prev = &bcache.head;
     b->dev = -1;
@@ -70,6 +85,7 @@ binit(void)
 struct buf*
 balloc(uint dev)
 {
+  waitseg();
   struct buf * b;
   acquire(&bcache.lock);
   for(b = bcache.head.prev; b != &bcache.head; b = b->prev){
@@ -92,7 +108,8 @@ bget(uint dev, block_t block)
 {
   if (block == 0)
     panic("bget: invalid block");
-
+ 
+  waitseg();
   struct buf *b;  
   acquire(&bcache.lock);
 
@@ -123,6 +140,7 @@ loop:
 struct buf*
 bread(uint dev, block_t block)
 {
+  waitseg();
   struct buf *b;
   b = bget(dev, block);
 
@@ -145,8 +163,8 @@ bwrite(struct buf *b)
     return 0;
   }
 
+  waitseg();
   acquire(&seg.lock);
-
   struct disk_superblock * sb = getsb();
 
   // initialize new seg
@@ -162,7 +180,12 @@ bwrite(struct buf *b)
   b->block = seg.start + SEGMETABLOCKS + seg.count++;
   b->flags |= B_DIRTY;
 
+  release(&seg.lock);
+
   if (seg.count == SEGDATABLOCKS) {
+    cprintf("WRITE SEGMENT\n");
+    seg.busy = 1;
+
     // write zeroes for block metadata for now    
     uint k;
     struct buf meta;
@@ -174,20 +197,23 @@ bwrite(struct buf *b)
       iderw(&meta);
     }
 
-    for (k = 0; k < SEGDATABLOCKS; k++)
+    for (k = 0; k < SEGDATABLOCKS; k++) {
+      int prevflags = seg.blocks[k]->flags;
+      seg.blocks[k]->flags = B_DIRTY | B_BUSY;
       iderw(seg.blocks[k]);
+      seg.blocks[k]->flags = prevflags & (~B_DIRTY);
+    }
     
     sb->segment = seg.start;
     sb->next += SEGBLOCKS;
     sb->nsegs++;
     sb->nblocks += SEGBLOCKS;
-    flushsb();
 
     memset(seg.blocks, 0, sizeof(seg.blocks));
-    seg.count = seg.start = 0;
+    seg.count = seg.start = seg.busy = 0;
+    wakeup(&seg);
   }
 
-  release(&seg.lock);
   return b->block;
 }
 
@@ -195,9 +221,10 @@ bwrite(struct buf *b)
 void
 brelse(struct buf *b)
 {
-  if((b->flags & B_BUSY) == 0)
-    panic("brelse");
+  // if((b->flags & B_BUSY) == 0)
+  //  panic("brelse");
 
+  waitseg();
   acquire(&bcache.lock);
 
   b->next->prev = b->prev;
