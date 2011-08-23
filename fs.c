@@ -416,7 +416,11 @@ writei(struct inode *ip, char *src, uint off, uint n)
     panic("writei unsupported size");
 
   for(tot=0; tot<n; tot+=m, off+=m, src+=m){
-    struct buf * bp = bread(ip->dev, ip->addrs[off/BSIZE]);
+    struct buf * bp;
+    if (ip->addrs[off/BSIZE] != 0)
+      bp = bread(ip->dev, ip->addrs[off/BSIZE]);
+    else
+      bp = balloc(ip->dev);
     m = min(n - tot, BSIZE - off%BSIZE);
     memmove(bp->data + off%BSIZE, src, m);
     ip->addrs[off/BSIZE] = bwrite(bp);
