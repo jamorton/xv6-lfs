@@ -159,6 +159,7 @@ iupdate(struct inode *ip)
   memmove(dip.addrs, ip->addrs, sizeof(ip->addrs));
   memmove(bp->data, &dip, sizeof(dip));
   imapset(ip->dev, ip->inum, bwrite(bp));
+  brelse(bp);
 }
 
 // Find the inode with number inum on device dev
@@ -389,7 +390,6 @@ readi(struct inode *ip, char *dst, uint off, uint n)
     bp = bread(ip->dev, bmap(ip, off/BSIZE));
     m = min(n - tot, BSIZE - off%BSIZE);
     memmove(dst, bp->data + off%BSIZE, m);
-    cprintf(" readi: %d\n", *((int*)dst));
     brelse(bp);
   }
   return n;
@@ -399,9 +399,7 @@ readi(struct inode *ip, char *dst, uint off, uint n)
 int
 writei(struct inode *ip, char *src, uint off, uint n)
 {
-  panic("writei");
   uint tot, m;
-  struct buf *bp;
 
   if(ip->type == T_DEV){
     if(ip->major < 0 || ip->major >= NDEV || !devsw[ip->major].write)
@@ -414,18 +412,22 @@ writei(struct inode *ip, char *src, uint off, uint n)
   if(off + n > MAXFILE*BSIZE)
     n = MAXFILE*BSIZE - off;
 
+  if (off + n > NDIRECT * BSIZE)
+    panic("writei unsupported size");
+
   for(tot=0; tot<n; tot+=m, off+=m, src+=m){
-    bp = bread(ip->dev, bmap(ip, off/BSIZE));
+    struct buf * bp = bread(ip->dev, ip->addrs[off/BSIZE]);
     m = min(n - tot, BSIZE - off%BSIZE);
     memmove(bp->data + off%BSIZE, src, m);
-    bwrite(bp);
+    ip->addrs[off/BSIZE] = bwrite(bp);
     brelse(bp);
   }
 
-  if(n > 0 && off > ip->size){
+  if(n > 0 && off > ip->size)
     ip->size = off;
-    iupdate(ip);
-  }
+
+
+  iupdate(ip);
   return n;
 }
 
