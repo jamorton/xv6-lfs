@@ -113,6 +113,12 @@ int main(int argc, char * argv[])
 	if (seg_block != 0)
 		seg_finish(sb.segment + SEGBLOCKS); 
 
+	// expand the drive image by a bit over 20 segments
+	bzero(buf, BSIZE);
+	uint k;
+	for (k = 0; k < SEGBLOCKS * 20 + 50; k++)
+		bwrite(cur_block + k, buf);
+
 	close(fsd);
 
 	return 0;

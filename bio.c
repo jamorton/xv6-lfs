@@ -49,12 +49,10 @@ static void waitseg(void)
 {
   if (seg.busy != 1)
     return;
-  cprintf("SLEEPING\n");
   acquire(&seg.lock);
   while (seg.busy == 1)
     sleep(&seg, &seg.lock);
   release(&seg.lock);
-  cprintf("WAKING\n");
 }
 
 void
@@ -171,7 +169,7 @@ bwrite(struct buf *b)
   if (seg.start == 0)
     seg.start = sb->next;
 
-  if ((b->flags & B_DIRTY) != 0) {
+  if ((b->flags & B_DIRTY) != 0 || (b->block > seg.start && b->block < seg.start + SEGBLOCKS)) {
     release(&seg.lock);
     return b->block;
   }
@@ -180,11 +178,9 @@ bwrite(struct buf *b)
   b->block = seg.start + SEGMETABLOCKS + seg.count++;
   b->flags |= B_DIRTY;
 
-  release(&seg.lock);
-
   if (seg.count == SEGDATABLOCKS) {
-    cprintf("WRITE SEGMENT\n");
     seg.busy = 1;
+    release(&seg.lock);
 
     // write zeroes for block metadata for now    
     uint k;
@@ -212,7 +208,8 @@ bwrite(struct buf *b)
     memset(seg.blocks, 0, sizeof(seg.blocks));
     seg.count = seg.start = seg.busy = 0;
     wakeup(&seg);
-  }
+  } else
+    release(&seg.lock);
 
   return b->block;
 }
@@ -221,8 +218,8 @@ bwrite(struct buf *b)
 void
 brelse(struct buf *b)
 {
-  // if((b->flags & B_BUSY) == 0)
-  //  panic("brelse");
+  if((b->flags & B_BUSY) == 0)
+    panic("brelse");
 
   waitseg();
   acquire(&bcache.lock);

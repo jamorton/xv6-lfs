@@ -108,6 +108,8 @@ void imapset(int dev, inode_t inum, block_t new)
 {
   struct buf * bp = bread(dev, getsb()->imap);
   block_t * imap = (block_t *)bp->data;
+  if (inum >= MAX_INODES)
+    panic("imapset");
   imap[inum] = new;
   getsb()->imap = bwrite(bp);
   brelse(bp);
