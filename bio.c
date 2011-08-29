@@ -179,6 +179,7 @@ bwrite(struct buf *b)
   b->flags |= B_DIRTY;
 
   if (seg.count == SEGDATABLOCKS) {
+    cprintf("bio: Writing segment.\n");
     seg.busy = 1;
     release(&seg.lock);
 

@@ -150,6 +150,17 @@ void
 iupdate(struct inode *ip)
 {
   struct disk_inode dip;
+  
+  // instead of just balloc()'ing a new block for every iupdate,
+  // we can try for a cached block by bread()'ing the disk inode
+  struct buf * imap_bp = bread(ip->dev, getsb()->imap);
+  block_t b = *((block_t *)imap_bp->data + ip->inum);
+  brelse(imap_bp);
+
+  if (b == 0)
+    panic("iupdate");
+
+  struct buf * bp = bread(ip->dev, b);
 
   dip.type = ip->type;
   dip.major = ip->major;
@@ -157,7 +168,6 @@ iupdate(struct inode *ip)
   dip.nlink = ip->nlink;
   dip.size = ip->size;
 
-  struct buf * bp = balloc(ip->dev);
   memmove(dip.addrs, ip->addrs, sizeof(ip->addrs));
   memmove(bp->data, &dip, sizeof(dip));
   imapset(ip->dev, ip->inum, bwrite(bp));

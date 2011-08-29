@@ -34,6 +34,7 @@ UPROGS=\
 	_grep\
 	_init\
 	_kill\
+	_lfstest\
 	_ln\
 	_ls\
 	_mkdir\
